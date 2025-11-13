@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { fetchGuests, fetchGuestById } from "./api";
+import { fetchGuests, fetchGuestById, updateGuest, createGuest } from "./api";
+
+import GuestList from "./GuestList";
+import GuestDetails from "./GuestDetails";
+import GuestEditForm from "./GuestEditForm";
+import NewGuestForm from "./NewGuestForm";
 
 export default function App() {
   const [guests, setGuests] = useState([]);
@@ -9,6 +14,9 @@ export default function App() {
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [error, setError] = useState(null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     async function loadGuests() {
@@ -53,6 +61,40 @@ export default function App() {
 
   function handleBack() {
     setSelectedId(null);
+    setIsEditing(false);
+    setIsCreating(false);
+  }
+
+  function handleEdit() {
+    setIsEditing(true);
+  }
+
+  async function handleSave(updatedFields) {
+    try {
+      const updated = await updateGuest(selectedId, updatedFields);
+
+      setSelectedGuest(updated);
+
+      setGuests(guests.map((g) => (g.id === updated.id ? updated : g)));
+
+      setIsEditing(false);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleCreate(newGuestData) {
+    try {
+      const created = await createGuest(newGuestData);
+
+      setGuests([...guests, created]);
+
+      setSelectedId(created.id);
+
+      setIsCreating(false);
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (
@@ -61,65 +103,49 @@ export default function App() {
 
       {error && <p className="error">Error: {error}</p>}
 
-      {selectedId === null && (
+      {selectedId === null && !isCreating && (
         <>
           {loadingList && <p>Loading guests...</p>}
+
           {!loadingList && (
-            <GuestList guests={guests} onSelect={setSelectedId} />
+            <>
+              <GuestList guests={guests} onSelect={setSelectedId} />
+
+              <button onClick={() => setIsCreating(true)}>
+                Invite New Guest
+              </button>
+            </>
           )}
         </>
       )}
 
-      {selectedId !== null && (
+      {isCreating && (
+        <NewGuestForm
+          onSave={handleCreate}
+          onCancel={() => setIsCreating(false)}
+        />
+      )}
+
+      {selectedId !== null && !isEditing && !isCreating && (
         <>
           {loadingDetails && <p>Loading guest details...</p>}
           {!loadingDetails && selectedGuest && (
-            <GuestDetails guest={selectedGuest} onBack={handleBack} />
+            <GuestDetails
+              guest={selectedGuest}
+              onBack={handleBack}
+              onEdit={handleEdit}
+            />
           )}
         </>
       )}
+
+      {selectedId !== null && isEditing && (
+        <GuestEditForm
+          guest={selectedGuest}
+          onSave={handleSave}
+          onCancel={() => setIsEditing(false)}
+        />
+      )}
     </main>
-  );
-}
-
-function GuestList({ guests, onSelect }) {
-  return (
-    <section>
-      <h2>Guests</h2>
-      <ul className="guest-list">
-        {guests.map((guest) => (
-          <li
-            key={guest.id}
-            className="guest-list-item"
-            onClick={() => onSelect(guest.id)}
-          >
-            <strong>{guest.name}</strong>
-            <div className="guest-email">{guest.email}</div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function GuestDetails({ guest, onBack }) {
-  return (
-    <section className="guest-details">
-      <h2>{guest.name}</h2>
-      <p>
-        <strong>Email:</strong> {guest.email}
-      </p>
-      <p>
-        <strong>Phone:</strong> {guest.phone}
-      </p>
-      <p>
-        <strong>Job:</strong> {guest.job}
-      </p>
-      <p>
-        <strong>Bio:</strong> {guest.bio}
-      </p>
-
-      <button onClick={onBack}>Back</button>
-    </section>
   );
 }
